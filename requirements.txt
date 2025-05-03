@@ -1,0 +1,14 @@
+numpy>=1.16
+scipy>=1.2
+matplotlib>=3.0
+cython>=0.29
+# PyAbel>=0.9.0
+hankel>=1.2.2
+mpmath>=1.3.0
+six>=1.10.0
+tifffile>=2021.4.8
+scikit-image>=0.17.2
+cmasher>=1.2.0
+cmap>=0.6.0
+imageio>=2.9.0
+Pillow>=8.0.0
