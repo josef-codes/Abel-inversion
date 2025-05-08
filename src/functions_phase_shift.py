@@ -262,3 +262,28 @@ def extract_phase_from_mask_v2(
         return phase[pad:-pad, pad:-pad]
     return phase
 
+
+def crop_img_base(image: np.ndarray, n_bottom: int) -> np.ndarray:
+    """
+    Crop a given number of pixels from the bottom of an image.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Input image array of shape (H, W) or (H, W, C).
+    n_bottom : int
+        Number of rows to remove from the bottom. Must be ≥ 0.
+
+    Returns
+    -------
+    cropped : np.ndarray
+        Image array of shape (H−n_bottom, W) or (H−n_bottom, W, C).
+    """
+    if n_bottom < 0:
+        raise ValueError(f"n_bottom must be non-negative, got {n_bottom}")
+    H = image.shape[0]
+    if n_bottom >= H:
+        # return an empty array with zero height
+        return image[:0].copy()
+    return image[:H - n_bottom].copy()
+

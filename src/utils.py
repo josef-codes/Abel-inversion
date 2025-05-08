@@ -18,6 +18,42 @@ def plot_intensity(profile):
     plt.show()
 
 
+def plot_1d_profile(
+    profile,
+    title: str = "1D Profile",
+    xlabel: str = "Index",
+    ylabel: str = "Value",
+    figsize: tuple[float, float] = (10, 4),
+    grid: bool = True
+):
+    """
+    Plot a 1D profile with customizable labels.
+
+    Parameters
+    ----------
+    profile : array-like
+        The 1D data to plot.
+    title : str
+        The title of the plot.
+    xlabel : str
+        Label for the x-axis.
+    ylabel : str
+        Label for the y-axis.
+    figsize : tuple of two floats
+        Width and height of the figure in inches.
+    grid : bool
+        Whether to show a grid.
+    """
+    plt.figure(figsize=figsize)
+    plt.plot(profile, lw=2)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    if grid:
+        plt.grid(True, linestyle=":")
+    plt.tight_layout()
+    plt.show()
+
 def plot_filtered_fft_spectrum(
     img_padded: np.ndarray,
     mask: np.ndarray,
