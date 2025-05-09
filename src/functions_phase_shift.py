@@ -58,8 +58,8 @@ def find_fourier_peaks(
     peak1 = divmod(idx1, cols)
     peak2 = divmod(idx2, cols)
 
-    # classify by x > center
-    if peak1[1] > cx:
+    # classify by y > center (rows index)
+    if peak1[0] > cy:
         plus1, minus1 = peak1, peak2
     else:
         plus1, minus1 = peak2, peak1
@@ -157,50 +157,6 @@ def circular_exclusion_mask(
 def extract_phase_from_mask(
     img_padded: np.ndarray,
     mask: np.ndarray,
-    peak_coord: tuple[int, int],
-    pad: int = 0
-) -> np.ndarray:
-    """
-    Apply a pre-computed elliptical mask in the Fourier domain and return the phase,
-    optionally cropping away the padded border.
-
-    Parameters
-    ----------
-    img_padded : 2D ndarray
-        Zero-padded image (rows = height, cols = width).
-    mask : 2D ndarray of same shape
-        Elliptical mask (boolean or float) created around peak_coord.
-    peak_coord : (y, x)
-        The row (y) and column (x) that defined the center of the ellipse.
-    pad : int, optional
-        Number of pixels of padding on each side to remove from the output.
-        If zero (default), no cropping is performed.
-
-    Returns
-    -------
-    phase_im : 2D ndarray
-        Phase of the inverse FFT of the masked spectrum, cropped to
-        `phase_im[pad:-pad, pad:-pad]` if `pad > 0`.
-    """
-    # 1. forward FFT & shift zero‐freq to center
-    f = np.fft.fftshift(np.fft.fft2(img_padded))
-
-    # 2. apply the mask
-    f_masked = f * mask
-
-    # 3. inverse shift & inverse FFT, then extract phase
-    rec = np.fft.ifft2(np.fft.ifftshift(f_masked))
-    phase = np.angle(rec)
-
-    # 4. crop away padding border if requested
-    if pad > 0:
-        return phase[pad:-pad, pad:-pad]
-    return phase
-
-
-def extract_phase_from_mask_v2(
-    img_padded: np.ndarray,
-    mask: np.ndarray,
     peak_coord: Tuple[int, int],
     pad: int = 0,
     inner_radius_mask: Optional[int] = None
@@ -261,6 +217,69 @@ def extract_phase_from_mask_v2(
     if pad > 0:
         return phase[pad:-pad, pad:-pad]
     return phase
+
+
+def compute_phase_from_padded(
+    img_padded: np.ndarray,
+    order: str = 'plus1',
+    exclude_radius: int = 10,
+    smooth_sigma: float = 0.0,
+    a_div: int = 9,
+    b_div: int = 9,
+    mask_sigma: float = 0.0,
+    pad: int = 0
+) -> np.ndarray:
+    """
+    Locate a given Fourier peak in a zero-padded image (using simple top-two method),
+    build an elliptical mask around it, and extract the phase image.
+
+    Parameters
+    ----------
+    img_padded : 2D ndarray
+        Zero-padded input image.
+    order : {'center','plus1','minus1'}
+        Which peak to isolate.
+    exclude_radius : int
+        Radius around DC to mask out before picking peaks.
+    smooth_sigma : float
+        Gaussian sigma for pre-peak FFT-magnitude smoothing.
+    a_div, b_div : int
+        Divisors for ellipse semi-axes: a = cols//a_div, b = rows//b_div.
+    mask_sigma : float
+        If >0, Gaussian-smooth the binary mask by this sigma.
+    pad : int
+        Number of pixels of padding on each side to remove from the output.
+
+    Returns
+    -------
+    phase_image : 2D ndarray
+        Phase of the inverse FFT of the masked Fourier component,
+        cropped to original size if pad>0.
+    """
+    coords = find_fourier_peaks(
+        img=img_padded,
+        exclude_radius=exclude_radius,
+        smooth_sigma=smooth_sigma
+    )
+    y0, x0 = coords[order]
+    rows, cols = img_padded.shape
+    a = cols // a_div
+    b = rows // b_div
+    mask = create_ellipse_mask(
+        shape=(rows, cols),
+        x_center=x0,
+        y_center=y0,
+        a=a,
+        b=b,
+        sigma=mask_sigma
+    )
+    return extract_phase_from_mask(
+        img_padded=img_padded,
+        mask=mask,
+        peak_coord=(y0, x0),
+        pad=pad,
+        inner_radius_mask=3
+    )
 
 
 def crop_img_base(image: np.ndarray, n_bottom: int) -> np.ndarray:

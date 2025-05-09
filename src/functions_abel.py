@@ -226,7 +226,7 @@ def inverse_abel(
     dr: float = 1.0,
     # BASEX parameters
     sigma: float = 2.0,
-    reg: float = 0.0,
+    reg: float = 10.0,
     correction: bool = True,
     # Hansen–Law parameters
     hold_order: int = 0
@@ -284,3 +284,43 @@ def inverse_abel(
         return np.asarray(recon, dtype=float)
 
 
+def compute_electron_density(
+    dN: np.ndarray,
+    lam: float = 532e-9,
+    N_ref: float = 1.0003
+) -> np.ndarray:
+    """
+    Compute the electron density, where
+      n_e(N0) = (omega * epsilon0 * m_electron / e_charge**2) * sqrt(1 - N0)
+
+    Parameters
+    ----------
+    dN : np.ndarray
+        Array of inverse Abel-transformed values (must satisfy N0 <= 1 for real sqrt).
+    lam : float
+        Wavelength of probing laser (in m).
+    N_ref : float
+        Reference refractive index. Default 1.0003 (air in ideal conditions).
+
+    Returns
+    -------
+    n_total : np.ndarray
+        Array of electron density in cm-3
+    """
+    # physical constants
+    epsilon0 = 8.85e-12               # vacuum permittivity (F/m)
+    m_electron = 9.1093837e-31          # electron mass (kg)
+    e_charge = 1.60217663e-19         # elementary charge (C)
+
+    # compute omega
+    omega = 2 * np.pi * 3e8 / lam  # ≈3.54e15 s⁻¹
+
+    # ensure argument of sqrt is non-negative
+    N = N_ref - dN
+    arg = np.clip(1.0 - N, 0.0, None)
+
+    # compute electron-contribution term n_e(N)
+    prefactor = omega * epsilon0 * m_electron / (e_charge**2)
+
+    # output in cm-3
+    return prefactor * np.sqrt(arg) * 1e6

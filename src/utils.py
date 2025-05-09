@@ -4,20 +4,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from typing import Optional
 
 
-def plot_intensity(profile):
-    """
-    Plots the sum.
-    """
-    plt.figure(figsize=(10, 4))
-    plt.plot(profile)
-    plt.title("Sum of intensities along horizontal axis")
-    plt.xlabel("Column index")
-    plt.ylabel("Summed intensity")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-
 def plot_1d_profile(
     profile,
     title: str = "1D Profile",
