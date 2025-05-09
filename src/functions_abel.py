@@ -324,3 +324,62 @@ def compute_electron_density(
 
     # output in cm-3
     return prefactor * np.sqrt(arg) * 1e6
+
+
+def revolve_profile_to_image(
+    profile: np.ndarray,
+    center_idx: int,
+    output_size: int | None = None,
+    interp: bool = False
+) -> np.ndarray:
+    """
+    Revolve a 1D profile around a central axis to create a 2D radially-symmetric image.
+
+    Parameters
+    ----------
+    profile : 1D np.ndarray
+        The input profile, of length M. The axis of symmetry lies at index `center_idx`.
+    center_idx : int
+        Index in `profile` corresponding to radius = 0.
+    output_size : int or None
+        Width/height of the output square image. If None, uses size = 2*r_max + 1,
+        where r_max = max(center_idx, len(profile)-center_idx-1).
+    interp : bool
+        If True, uses linear interpolation for non-integer radii; otherwise, nearest-index.
+
+    Returns
+    -------
+    image : 2D np.ndarray
+        A square image of shape (N, N), radially symmetric, where N = output_size.
+        Pixel intensity at (y, x) = profile[center_idx + r] for rounded (or interpolated)
+        radial distance r = sqrt((x - cx)**2 + (y - cy)**2).
+    """
+    M = profile.size
+    r_max = max(center_idx, M - center_idx - 1)
+    # determine output size
+    N = output_size if output_size is not None else 2*r_max + 1
+    cx = cy = N // 2
+
+    # build coordinate grids
+    y = np.arange(N) - cy  # signed coordinate
+    x = np.arange(N) - cx
+    X, Y = np.meshgrid(x, y, indexing='xy')
+    R = np.sqrt(X**2 + Y**2)
+
+    # map radius to profile index
+    if interp:
+        # fractional index = center_idx + R
+        idx = center_idx + R
+        # mask
+        mask = (idx >= 0) & (idx <= M-1)
+        image = np.zeros((N, N), dtype=float)
+        image[mask] = np.interp(idx[mask], np.arange(M), profile)
+    else:
+        # nearest integer radius
+        ri = np.rint(R).astype(int)
+        idx = center_idx + ri
+        mask = (idx >= 0) & (idx < M)
+        image = np.zeros((N, N), dtype=float)
+        image[mask] = profile[idx[mask]]
+
+    return image

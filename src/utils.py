@@ -139,7 +139,7 @@ def plot_fft_spectra(
     divider_m = make_axes_locatable(axes[0])
     cax_m = divider_m.append_axes("right", size="5%", pad=0.05)
     cbar_m = fig.colorbar(im_m, cax=cax_m)
-    cbar_m.set_label("|A|", rotation=270, labelpad=15)
+    cbar_m.set_label("|A|", rotation=90, labelpad=15)
 
     # Phase Spectrum
     im_p = axes[1].imshow(phase, cmap=cmap_phase)
@@ -148,11 +148,33 @@ def plot_fft_spectra(
     divider_p = make_axes_locatable(axes[1])
     cax_p = divider_p.append_axes("right", size="5%", pad=0.05)
     cbar_p = fig.colorbar(im_p, cax=cax_p)
-    cbar_p.set_label("Phase", rotation=270, labelpad=15)
+    cbar_p.set_label("Phase $\Phi$", rotation=90, labelpad=15)
 
     plt.tight_layout()
     plt.show()
 
+def plot_image_row(img: np.ndarray, row: int, title: str = None) -> None:
+    """
+    Plot the intensity profile of a single row of a 2D image.
 
+    Parameters
+    ----------
+    img : 2D ndarray
+        Input image (rows = height, cols = width).
+    row : int
+        Zero-based index of the row to plot (vertical coordinate).
+    title : str, optional
+        Plot title.
+    """
+    profile = img[row, :]            # grab the row (y = row, all x)
+    plt.figure(figsize=(10, 4))
+    plt.plot(profile)
+    if title:
+        plt.title(title)
+    plt.xlabel("Column index (x)")
+    plt.ylabel("Phase shift $\Delta\Phi$")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 
