@@ -58,8 +58,8 @@ def find_fourier_peaks(
     peak1 = divmod(idx1, cols)
     peak2 = divmod(idx2, cols)
 
-    # classify by y > center (rows index)
-    if peak1[0] > cy:
+    # classify by y < center (rows index)
+    if peak1[0] < cy:
         plus1, minus1 = peak1, peak2
     else:
         plus1, minus1 = peak2, peak1
