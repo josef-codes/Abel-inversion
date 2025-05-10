@@ -178,3 +178,37 @@ def plot_image_row(img: np.ndarray, row: int, title: str = None) -> None:
     plt.show()
 
 
+def crop_three_sides(img: np.ndarray, r: int) -> np.ndarray:
+    """
+    Crop an image from the left, right, and top, keeping the bottom intact.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        Input image, shape (H, W[, ...]).
+    r : int
+        Radius to keep around the center column and above the bottom:
+          • width of output = 2*r + 1  (center_col - r  … center_col + r)
+          • height of output = 2*r + 1 (bottom_row - 2*r  … bottom_row)
+
+    Returns
+    -------
+    cropped : np.ndarray
+        The cropped image of shape (2*r+1, 2*r+1[, ...]).
+    """
+    H, W = img.shape[:2]
+    if not isinstance(r, int) or r < 0:
+        raise ValueError("r must be a non-negative integer")
+
+    center = W // 2
+    left   = max(0, center - r)
+    right  = min(W, center + r + 1)
+
+    top    = max(0, H - (2*r + 1))
+    bottom = H
+
+    # slice rows then cols; preserve any extra channels
+    cropped = img[top:bottom, left:right, ...]
+    return cropped
+
+
