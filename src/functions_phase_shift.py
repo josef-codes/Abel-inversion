@@ -1,12 +1,13 @@
 import numpy as np
 from scipy.ndimage import gaussian_filter
+from skimage.restoration import unwrap_phase
 from typing import Optional, Tuple
 
 
 def find_fourier_peaks(
     img: np.ndarray,
-    exclude_radius: int = 10,
-    smooth_sigma: float = 0.0
+    exclude_radius: int = 8,
+    smooth_sigma: float = 2
 ) -> dict:
     """
     Simple detection of the DC and first-order peaks in the FFT magnitude by:
@@ -256,30 +257,83 @@ def compute_phase_from_padded(
         Phase of the inverse FFT of the masked Fourier component,
         cropped to original size if pad>0.
     """
-    coords = find_fourier_peaks(
-        img=img_padded,
-        exclude_radius=exclude_radius,
-        smooth_sigma=smooth_sigma
-    )
-    y0, x0 = coords[order]
-    rows, cols = img_padded.shape
-    a = cols // a_div
-    b = rows // b_div
-    mask = create_ellipse_mask(
-        shape=(rows, cols),
-        x_center=x0,
-        y_center=y0,
-        a=a,
-        b=b,
-        sigma=mask_sigma
-    )
-    return extract_phase_from_mask(
-        img_padded=img_padded,
-        mask=mask,
-        peak_coord=(y0, x0),
-        pad=pad,
-        inner_radius_mask=3
-    )
+    try:
+        coords = find_fourier_peaks(
+            img=img_padded,
+            exclude_radius=exclude_radius,
+            smooth_sigma=smooth_sigma
+        )
+        y0, x0 = coords[order]
+        rows, cols = img_padded.shape
+        a = cols // a_div
+        b = rows // b_div
+        mask = create_ellipse_mask(
+            shape=(rows, cols),
+            x_center=x0,
+            y_center=y0,
+            a=a,
+            b=b,
+            sigma=mask_sigma
+        )
+        return extract_phase_from_mask(
+            img_padded=img_padded,
+            mask=mask,
+            peak_coord=(y0, x0),
+            pad=pad,
+            inner_radius_mask=3
+        )
+    except ZeroDivisionError:
+        print("Warning: Division by zero in compute_phase_from_padded. Skipping.")
+        try:
+            if order == 'minus1':
+                order = 'plus1'
+            else:
+                order = 'minus1'
+            y0, x0 = coords[order]
+            rows, cols = img_padded.shape
+            a = cols // a_div
+            b = rows // b_div
+            mask = create_ellipse_mask(
+                shape=(rows, cols),
+                x_center=x0,
+                y_center=y0,
+                a=a,
+                b=b,
+                sigma=mask_sigma
+            )
+            return extract_phase_from_mask(
+                img_padded=img_padded,
+                mask=mask,
+                peak_coord=(y0, x0),
+                pad=pad,
+                inner_radius_mask=3
+            )
+        except:
+            return img_padded  # Or np.zeros_like(img_padded), or raise, depending on downstream needs
+
+
+
+def unwrap_phase_image(
+    phase_image: np.ndarray
+) -> np.ndarray:
+    """
+    Perform a 2D phase unwrapping on the input wrapped-phase image.
+
+    Parameters
+    ----------
+    phase_image : np.ndarray, shape (H, W)
+        Wrapped phase map (values in the range [-π, π] or similar).
+
+    Returns
+    -------
+    unwrapped : np.ndarray, shape (H, W)
+        Unwrapped phase map, continuous over the image.
+    """
+    # ensure array
+    arr = np.asarray(phase_image, dtype=float)
+    # call scikit-image’s unwrap
+    unwrapped = unwrap_phase(arr)
+    return unwrapped
 
 
 def crop_img_base(image: np.ndarray, n_bottom: int) -> np.ndarray:

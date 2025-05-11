@@ -1,6 +1,22 @@
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import correlate
 import numpy as np  # low level image manipulation (matrix)
+from typing import Tuple
+
+
+def smooth_profile(profile, sigma: float = 2):
+    """
+    Function not important, just here to display the smoothing
+    """
+    return gaussian_filter1d(profile, sigma)
+
+
+def calculate_1d_gradient(profile, sigma):
+    """
+    Function not important, just here to display the gradient
+    """
+    smoothed = smooth_profile(profile, sigma)
+    return np.gradient(smoothed)
 
 
 def get_horizontal_intensity_sum(image):
@@ -11,16 +27,7 @@ def get_horizontal_intensity_sum(image):
     return image.sum(axis=0)
 
 
-def smooth_profile(profile, sigma=2):
-    return gaussian_filter1d(profile, sigma)
-
-
-def calculate_1d_gradient(profile, sigma):
-    smoothed = smooth_profile(profile, sigma)
-    return np.gradient(smoothed)
-
-
-def detect_edges(profile, smoothing_sigma=5, threshold_ratio=0.3):
+def detect_edges(profile, smoothing_sigma: float = 5, threshold_ratio: float = 0.3):
     """
     Detect the left and right edges in a 1D intensity profile.
 
@@ -54,7 +61,7 @@ def detect_edges(profile, smoothing_sigma=5, threshold_ratio=0.3):
     return left_edge, right_edge
 
 
-def center_by_symmetry_1d(profile, smoothing_sigma=5):
+def center_by_symmetry_1d(profile, smoothing_sigma: float = 5):
     """
     Find the horizontal center of maximal left-right symmetry in a 1D profile.
     """
@@ -70,6 +77,57 @@ def center_by_symmetry_1d(profile, smoothing_sigma=5):
     # for profile length n the formula is (2n - 2 - lag) / 2
     center = int((2 * n - 2 - lag) / 2)
     return center
+
+
+def compute_crop_params(
+    img: np.ndarray,
+    px: int,
+    smoothing_sigma: float = 6.0,
+    threshold_ratio: float = 0.3
+) -> Tuple[int, int, int]:
+    """
+    Compute the horizontal start, width, and full height for cropping an image.
+
+    Parameters
+    ----------
+    img : np.ndarray, shape (H, W)
+        Input image.
+    px : int
+        Number of extra pixels to subtract from the detected edge‐to‐edge width.
+    smoothing_sigma : float
+        Sigma for the internal smoothing used by `detect_edges`.
+    threshold_ratio : float
+        Fraction of the profile maximum at which to detect edges.
+
+    Returns
+    -------
+    sx : int
+        The start column index for the crop (midpoint of the two detected edges).
+    wid : int
+        The width of the crop: (right_edge − left_edge − px).
+    hei : int
+        The height of the crop: full image height (H).
+    """
+    # 1) Sum intensities along each column
+    profile = get_horizontal_intensity_sum(img)
+
+    # 2) Detect left/right edges of the region of interest
+    l, r = detect_edges(
+        profile,
+        smoothing_sigma=smoothing_sigma,
+        threshold_ratio=threshold_ratio
+    )
+
+    # 3) Center start index is midpoint of edges
+    sx = (l + r) // 2
+
+    # 4) Crop width excludes `px` extra columns
+    wid = (r - l) - px
+
+    # 5) Crop height is the full image height
+    hei = img.shape[0]
+
+    return sx, wid, hei
 
 
 def crop_from_center(image, sx, width, height, sy=None):

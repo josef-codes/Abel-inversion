@@ -40,75 +40,46 @@ def masked_average(image: np.ndarray, mask: np.ndarray) -> float:
 def otsu_binary_mask(
         img: np.ndarray,
         method: str = 'multiotsu',
-        classes: int = 3,
+        n_classes: int = 3,
         remove_small: int = 10,
         close_size: int = 0,
         gaussian_sigma: float = 0,
         keep_largest: bool = False
 ) -> Tuple[np.ndarray, float]:
     """
-    Extract the very bright peak region from `img`, clean it, and optionally blur.
-
-    Steps:
-      1) Threshold (Otsu or multi-Otsu).
-      2) Remove small objects.
-      3) Optionally binary-close with a square structuring element.
-      4) Optionally Gaussian-blur the mask and re-binarize.
-      5) Optionally keep only the largest connected component.
-
-    Parameters
-    ----------
-    img : 2D array
-        Input image.
-    method : {'otsu','multiotsu'}
-        Thresholding method.
-    classes : int
-        Number of classes for multi-Otsu.
-    remove_small : int
-        Remove islands smaller than this.
-    close_size : int
-        If >0, square closing of this size.
-    gaussian_sigma : float
-        If >0, sigma for Gaussian blur applied to the binary mask,
-        then re-thresholded at 0.5 back to binary.
-    keep_largest : bool
-        If True, only keep the largest connected component.
+    Extract the bright‐peak mask via Otsu or multi‐Otsu, clean it, and
+    optionally blur
 
     Returns
     -------
     mask : 2D bool array
-        Final cleaned (and optionally blurred) bright-peak mask.
-    thr : float
-        The threshold used (Otsu value or multi-Otsu top-class edge).
+    thr  : float
     """
-    # 1) threshold
     if method == 'otsu':
         thr = threshold_otsu(img)
         mask = img > thr
+
     elif method == 'multiotsu':
-        threshs = threshold_multiotsu(img, classes=classes)
+        # <-- must use 'classes', not 'n_classes'
+        threshs = threshold_multiotsu(img, classes=n_classes)
         thr = float(threshs[-1])
         regions = np.digitize(img, bins=threshs)
-        mask = (regions == classes - 1)
+        mask = (regions == n_classes - 1)
+
     else:
         raise ValueError("method must be 'otsu' or 'multiotsu'")
 
-    # 2) remove small islands
     if remove_small > 0:
         mask = remove_small_objects(mask, min_size=remove_small)
 
-    # 3) binary closing
     if close_size > 0:
         struct = np.ones((close_size, close_size), dtype=bool)
         mask = binary_closing(mask, structure=struct)
 
-    # 4) optional Gaussian blur on the mask
     if gaussian_sigma > 0:
-        # blur the mask (as float), then threshold at 0.5
         blurred = gaussian_filter(mask.astype(float), sigma=gaussian_sigma)
         mask = blurred >= 0.5
 
-    # 5) keep largest component
     if keep_largest:
         lbl = label(mask)
         props = regionprops(lbl)
@@ -117,3 +88,44 @@ def otsu_binary_mask(
             mask = (lbl == largest)
 
     return mask, thr
+
+
+def fill_bottom_rectangle(mask: np.ndarray) -> np.ndarray:
+    """
+    Given a 2D boolean mask, find the horizontal span and bottom edge
+    of the True region, and then extend that span down to the bottom of
+    the image in a solid rectangle.
+
+    Parameters
+    ----------
+    mask : 2D bool array, shape (H, W)
+        Your initial mask (True = foreground).
+
+    Returns
+    -------
+    new_mask : 2D bool array, shape (H, W)
+        A copy of `mask` but with everything in the rectangle
+        spanning [left..right] × [bottom..H-1] set to True, where:
+          • left   = first column containing any True
+          • right  = last  column containing any True
+          • bottom = largest row index containing any True
+    """
+    H, W = mask.shape
+    # find all True coordinates
+    ys, xs = np.nonzero(mask)
+    if ys.size == 0:
+        # nothing to fill
+        return mask.copy()
+
+    # 1) leftmost and rightmost columns
+    left = xs.min()
+    right = xs.max()
+
+    # 2) bottom-most row
+    bottom = ys.max()
+
+    # 3) build new mask
+    new_mask = mask.copy()
+    new_mask[bottom:H, left:right + 1] = True
+
+    return new_mask

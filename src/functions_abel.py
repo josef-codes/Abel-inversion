@@ -176,13 +176,18 @@ def mirror_image(half_image: np.ndarray) -> np.ndarray:
     return full_image
 
 
+from scipy.ndimage import gaussian_filter, gaussian_filter1d
+
+
 def symmetrize_plasma_img(
     image: np.ndarray,
-    n_rows: int
+    n_rows: int,
+    gaussian_sigma: float = 0.0,
+    smooth_per_row: bool = False
 ) -> np.ndarray:
     """
     Apply a 1D transform to the bottom `n_rows` of each row in `image`,
-    zeroing out the rows above.
+    zeroing out the rows above, and optionally smooth the result.
 
     Parameters
     ----------
@@ -190,30 +195,50 @@ def symmetrize_plasma_img(
         Input image.
     n_rows : int
         Number of rows (from the bottom) to process.
+    gaussian_sigma : float
+        Standard deviation for Gaussian smoothing. If >0, applies
+        smoothing either per-row or on the entire 2D output.
+    smooth_per_row : bool
+        If True, apply 1D Gaussian smoothing along each processed row.
+        If False (default), apply 2D Gaussian smoothing to the full image.
+
     Returns
     -------
     out : np.ndarray, shape (H, W)
         Output image where:
-          - rows H-n_rows ... H-1 are replaced by symmetrize_func(row)
-          - rows   0     ... H-n_rows-1 are all zeros
+          - rows H-n_rows ... H-1 are replaced by symmetrize_via_fft(row)
+            then optionally smoothed.
+          - rows   0     ... H-n_rows-1 are all zeros.
     """
     H, W = image.shape
     if not (0 <= n_rows <= H):
         raise ValueError(f"n_rows must be between 0 and {H}, got {n_rows}")
 
+    # initialize output
     out = np.zeros_like(image, dtype=float)
 
-    # Process bottom n_rows
+    # Process bottom n_rows with the FFT-based symmetrize
     for i in range(n_rows):
         row_idx = H - 1 - i
         profile = image[row_idx, :].astype(float)
         transformed = symmetrize_via_fft(profile)
         if transformed.shape != (W,):
             raise ValueError(
-                f"symmetrize_func must return length {W}, "
+                f"symmetrize_via_fft must return length {W}, "
                 f"but got {transformed.shape}"
             )
         out[row_idx, :] = transformed
+
+    # Optional smoothing
+    if gaussian_sigma > 0:
+        if smooth_per_row:
+            # 1D smoothing on each processed row
+            for i in range(n_rows):
+                row_idx = H - 1 - i
+                out[row_idx, :] = gaussian_filter1d(out[row_idx, :], sigma=gaussian_sigma)
+        else:
+            # 2D Gaussian smoothing on the full image
+            out = gaussian_filter(out, sigma=gaussian_sigma)
 
     return out
 

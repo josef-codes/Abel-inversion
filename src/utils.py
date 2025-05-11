@@ -1,16 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 
 def plot_1d_profile(
-    profile,
-    title: str = "1D Profile",
-    xlabel: str = "Index",
-    ylabel: str = "Value",
-    figsize: tuple[float, float] = (10, 4),
-    grid: bool = True
+        profile,
+        title: str = "1D Profile",
+        xlabel: str = "Index",
+        ylabel: str = "Value",
+        figsize: tuple[float, float] = (10, 4),
+        grid: bool = True
 ):
     """
     Plot a 1D profile with customizable labels.
@@ -40,11 +40,12 @@ def plot_1d_profile(
     plt.tight_layout()
     plt.show()
 
+
 def plot_filtered_fft_spectrum(
-    img_padded: np.ndarray,
-    mask: np.ndarray,
-    extra_mask: Optional[np.ndarray] = None,
-    cmap_mag: str = 'gray'
+        img_padded: np.ndarray,
+        mask: np.ndarray,
+        extra_mask: Optional[np.ndarray] = None,
+        cmap_mag: str = 'gray'
 ) -> plt.Figure:
     """
     Plot the log-scaled magnitude of a masked FFT spectrum, optionally
@@ -95,12 +96,13 @@ def plot_filtered_fft_spectrum(
 
     return fig
 
+
 def plot_fft_spectra(
-    image,
-    log_scale=True,
-    cmap_mag='inferno',
-    cmap_phase='twilight',
-    figsize=(13, 6)
+        image,
+        log_scale=True,
+        cmap_mag='inferno',
+        cmap_phase='twilight',
+        figsize=(13, 6)
 ):
     """
     Compute FFT magnitude and phase spectra of an image and display them side by side.
@@ -153,6 +155,7 @@ def plot_fft_spectra(
     plt.tight_layout()
     plt.show()
 
+
 def plot_image_row(img: np.ndarray, row: int, title: str = None) -> None:
     """
     Plot the intensity profile of a single row of a 2D image.
@@ -166,7 +169,7 @@ def plot_image_row(img: np.ndarray, row: int, title: str = None) -> None:
     title : str, optional
         Plot title.
     """
-    profile = img[row, :]            # grab the row (y = row, all x)
+    profile = img[row, :]  # grab the row (y = row, all x)
     plt.figure(figsize=(10, 4))
     plt.plot(profile)
     if title:
@@ -201,10 +204,10 @@ def crop_three_sides(img: np.ndarray, r: int) -> np.ndarray:
         raise ValueError("r must be a non-negative integer")
 
     center = W // 2
-    left   = max(0, center - r)
-    right  = min(W, center + r + 1)
+    left = max(0, center - r)
+    right = min(W, center + r + 1)
 
-    top    = max(0, H - (2*r + 1))
+    top = max(0, H - (2 * r + 1))
     bottom = H
 
     # slice rows then cols; preserve any extra channels
