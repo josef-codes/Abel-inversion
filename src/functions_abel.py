@@ -309,6 +309,38 @@ def inverse_abel(
         return np.asarray(recon, dtype=float)
 
 
+def normalize_image(
+    image: np.ndarray,
+    force_zero: bool = False
+) -> np.ndarray:
+    """
+    Shift an image so that its minimum pixel value is 0.
+
+    By default, only does this if there are negative values.
+    If force_zero=True, always shift so that min(image)==0.
+
+    Parameters:
+        image (np.ndarray): Input image array (any shape/dtype).
+        force_zero (bool):
+            - False (default): only shift if image.min() < 0.
+            - True: always shift, even if image.min() >= 0.
+
+    Returns:
+        np.ndarray: A new array with its minimum value at 0.
+    """
+    # Find the minimum value
+    min_val = image.min()
+
+    # Decide whether to shift
+    if force_zero or min_val < 0:
+        # Subtracting min_val will push the minimum to 0
+        # (if min_val < 0 this is equivalent to adding abs(min_val))
+        return image - min_val
+
+    # No change needed
+    return image
+
+
 def compute_electron_density(
     dN: np.ndarray,
     lam: float = 532e-9,

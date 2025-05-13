@@ -34,12 +34,12 @@ path = global_constants.base_dir
 data_folders = global_utils.get_folder_names(path)  # ['IDEA program+ cvicna data', 'Images', 'Spectra']
 path2 = os.path.join(path, data_folders[1])
 # this will change:
-wavelength_folders = global_utils.get_folder_names(path2)  # ['1064 nm', '2090 nm']
-# 0) ['H0_3_28_25', 'H6_3_31_25']
-# 1) ['Cu', 'H0', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'wrong']
-path3 = os.path.join(path2, wavelength_folders[0])
+wavelength_folders = global_utils.get_folder_names(path2)
+
+path3 = os.path.join(path2, wavelength_folders[0]) # [0 = '1064 nm', 1 = '2090 nm']
 sample_folders = global_utils.get_folder_names(path3)
-# ['(1) 50-1000ns', '(2) 1000 - 2000 ns', '(3) 2-5us', '(4) 5-14.5us', '(5) 15-100us', '(6) 100-525us', '(7) 500us-2ms', 'reference x1', 'reference x2', 'reference x4', 'wrong beginning']
+# 0) [0 = 'H0_3_28_25', 1 = 'H6_3_31_25']
+# 1) ['Cu', 'H0', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'wrong']
 path4 = os.path.join(path3, sample_folders[1])
 measurement_folders = global_utils.get_folder_names(path4)
 print(data_folders)
@@ -59,9 +59,9 @@ print(measurement_folders)
 
 # -------------- LOAD configurations ----------------------------
 # here I save images, .json etc...:
-output_dir = r'C:\Users\User\z\Desktop\WUT\Diplomka\ZPRACOVÁNÍ\Data testing\processing_project\Abel-inversion\output\H6_1064_2-5us'
+output_dir = r'C:\Users\User\z\Desktop\WUT\Diplomka\ZPRACOVÁNÍ\Data testing\processing_project\Abel-inversion\output\(2) H6_1064_1-2us_v2'
 
-path_json = r'C:\Users\User\z\Desktop\WUT\Diplomka\DATA\Images\image processing param json\(3) 1064nm_H6_2-5us.json'
+path_json = r'C:\Users\User\z\Desktop\WUT\Diplomka\DATA\Images\image processing param json\1064nm\(2) 1064nm_H6_1-2us.json'
 with open(path_json) as f:
     data = json.load(f)
 
@@ -73,6 +73,9 @@ y_peak_shift = data['y_peak_shift']
 shift_val = data['shift_val']
 base_crop = data['base_crop']
 mask_radius = data['mask_radius']
+bool_remove_tilt = data['bool_remove_tilt']
+bool_tilt_masked = data['bool_tilt_masked']
+bool_normalise_phase = data['bool_normalise_phase']
 symmetrize_gauss = data['symmetrize_gauss']
 r_electron_density = data['r_electron_density']
 missing_bottom = data['missing_bottom']
@@ -116,6 +119,7 @@ keep_largest = True
 p = constants.p
 exclude_radius_peaks = constants.exclude_radius_peaks
 smooth_spectra_sigma = constants.smooth_spectra_sigma
+treshold_phase_ratio = constants.treshold_phase_ratio
 # mask param (do not touch)
 a = constants.a  # x-axis mask
 # b = spectr_peak_distance  # y-axis mask
@@ -160,19 +164,23 @@ if __name__ == "__main__":
     avg_el_density = []
     row_el_density = []
     # reference
-    path_ref_files = os.path.join(path4, measurement_folders[7]) # (8) = x2, (9) = x4 -> 1049 H0, (7) = 2x H6
+    # ['(1) 50-1000ns', '(2) 1000 - 2000 ns', '(3) 2-5us', '(4) 5-14.5us', '(5) 15-100us', '(6) 100-525us', '(7) 500us-2ms', 'reference x1', 'reference x2', 'reference x4', 'wrong beginning']
+    # (8) = x2, (9) = x4 -> 1064 H0, (7) = 2x H6
+    # 2090: (6) x4 (9) x2
+    path_ref_files = os.path.join(path4, measurement_folders[9])
     files_ref = global_utils.get_file_names(path_ref_files)
     print(files_ref)
-    ref_path = os.path.join(path_ref_files, files_ref[3]) # path to reference image
+    ref_path = os.path.join(path_ref_files, files_ref[3])  # path to reference image
     ref = tiff.imread(ref_path)
     # image files
-    path_img_files = os.path.join(path4, measurement_folders[2])
-    files_img = global_utils.get_file_names(path_img_files) # files to iterate over
+    # ['(1) 50-1000ns', '(2) 1000 - 2000 ns', '(3) 2-5us', '(4) 6-15us', '(5) 15-100us', '(6) 100-525us', '(7) 500us-2ms', 'reference x1', 'reference x2', 'reference x4', 'wrong beginning']
+    path_img_files = os.path.join(path4, measurement_folders[1]) #
+    files_img = global_utils.get_file_names(path_img_files)  # files to iterate over
     print(path_img_files)
     print(ref_path)
     # number of rows is total files divided by 10
     n_rows = len(files_img) // 10
-
+    print(f'n_rows: {n_rows}')
     # Loop over X positions 1…10
     for col in range(n_rows):
         print('-------')
@@ -251,9 +259,8 @@ if __name__ == "__main__":
             phase_shift = phase_map_ref - phase_map_im
             phase_shift = np.mod(phase_shift, 2 * np.pi)  # modulo 2pi
             phase_shift_crop = functions_phase_shift.crop_img_base(phase_shift, base_crop)  # crop base of the image
+            phase_shift_crop = utils.crop_lrt(phase_shift_crop, n=10)  # crops image left, right, top by 10 px to get rid of edge artefacts
             image_unwrapped = functions_phase_shift.unwrap_phase_image(phase_shift_crop)
-
-
 
 
             # ---- PRE-PROCESS INVERSE ABEL TRANSFORM (1)----
@@ -262,20 +269,34 @@ if __name__ == "__main__":
             y0 = rows - 1  # bottom row of an image
             x0 = cols // 2  # middle column of an image
 
-
-
-
             semicircle_mask = functions_abel.make_semicircle_mask((rows, cols),
                                                                   center=(y0, x0),
                                                                   radius=mask_radius,
                                                                   smooth_sigma=None)
+            if bool_remove_tilt:
+                # removing tilt in background
+                if bool_tilt_masked:
+                    mask_flipped = 1 - semicircle_mask.astype(bool)  # I need the outside
+                    bg, coeffs = functions_phase_shift.fit_plane_background(image_unwrapped, mask=mask_flipped)
+                else:
+                    bg, coeffs = functions_phase_shift.fit_plane_background(image_unwrapped)
+
+                image_unwrapped = image_unwrapped - bg  # remove background
+
+            if bool_normalise_phase:  # normalise to 0
+                    image_unwrapped = functions_abel.normalize_image(image_unwrapped, force_zero=True)  # normalise
+
+
             semicircle_mask2 = functions_abel.make_semicircle_mask((rows, cols),
                                                                   center=(y0, x0),
                                                                   radius=mask_radius//2,
                                                                   smooth_sigma=None)
             # check if plasma is positive, else calculate again
             invert = functions_electron_density_analysis.masked_average(image_unwrapped, semicircle_mask2)
-            if invert < 0:
+            max_val = np.max(image_unwrapped)
+            min_val = np.min(image_unwrapped)
+            threshold_phase = min_val + (max_val - min_val) / treshold_phase_ratio  # treshold 1/3 above minimum
+            if invert < threshold_phase:
                 if peak_name == 'plus1':
                     peak_name = 'minus1'
                 else:
@@ -313,8 +334,23 @@ if __name__ == "__main__":
                 phase_shift = phase_map_ref - phase_map_im
                 phase_shift = np.mod(phase_shift, 2 * np.pi)  # modulo 2pi
                 phase_shift_crop = functions_phase_shift.crop_img_base(phase_shift, base_crop)  # crop base of the image
+                phase_shift_crop = utils.crop_lrt(phase_shift_crop, n=10)  # crops image left, right, top by 10 px to get rid of edge artefacts
                 image_unwrapped = functions_phase_shift.unwrap_phase_image(phase_shift_crop)
+                # removing tilt in background
+                if bool_remove_tilt:
+                    if bool_tilt_masked:
+                        mask_flipped = 1 - semicircle_mask.astype(bool)  # I need the outside
+                        bg, coeffs = functions_phase_shift.fit_plane_background(image_unwrapped, mask=mask_flipped)
+                    else:
+                        bg, coeffs = functions_phase_shift.fit_plane_background(image_unwrapped)
 
+                    image_unwrapped = image_unwrapped - bg  # remove background
+
+                if bool_normalise_phase:  # normalise to 0
+                    image_unwrapped = functions_abel.normalize_image(image_unwrapped, force_zero=True)  # normalise
+
+
+            # mask plasma:
             masked_plasma = image_unwrapped * semicircle_mask
             # ---- PRE-PROCESS ABEL TRANSFORM (2)----
             symmetrize_plasma = functions_abel.symmetrize_plasma_img(masked_plasma, n_rows=mask_radius, gaussian_sigma=symmetrize_gauss,
@@ -332,6 +368,8 @@ if __name__ == "__main__":
             inv_abel_full = functions_abel.mirror_image(inv_abel)
 
             # ---- INDEX OF REFRACTION -> ELECTRON DENSITY ----
+            # if negative values, shift them so there is only positive vals (min = 0):
+            # inv_abel_shifted = functions_abel.normalize_negative_image(inv_abel_full)
             electron_density = functions_abel.compute_electron_density(inv_abel_full)
 
             # ---- ELECTRON DENSITY MASKING ----

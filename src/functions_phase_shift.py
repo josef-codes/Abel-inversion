@@ -336,6 +336,59 @@ def unwrap_phase_image(
     return unwrapped
 
 
+def fit_plane_background(img: np.ndarray, mask: np.ndarray = None):
+    """
+    Fit a 1st-order plane to an image:
+        z(x,y) = c0 + c_x*x + c_y*y
+
+    Parameters
+    ----------
+    img : 2D ndarray, shape (H, W)
+        Your grayscale (unwrapped phase) image.
+    mask : 2D bool ndarray, same shape as `img`, optional
+        If provided, only pixels where mask==True are used to determine the plane.
+
+    Returns
+    -------
+    bg : 2D ndarray, shape (H, W)
+        The best-fit plane evaluated at every (x,y).
+    coeffs : tuple (c0, c_x, c_y)
+        Offset and slopes of the plane.
+    """
+    # 1) Get image dimensions
+    H, W = img.shape
+
+    # 2) Build x- and y-coordinate grids
+    #    X[i,j] = j  (column index)
+    #    Y[i,j] = i  (row index)
+    y = np.arange(H)
+    x = np.arange(W)
+    X, Y = np.meshgrid(x, y)
+
+    # 3) Flatten everything into 1D arrays for least-squares
+    Z = img.ravel().astype(float)   # pixel values
+    Xf = X.ravel()                   # x coords
+    Yf = Y.ravel()                   # y coords
+
+    # 4) If mask on the input, restrict to mask==True
+    if mask is not None:
+        m = mask.ravel()
+        Xf, Yf, Z = Xf[m], Yf[m], Z[m]
+
+    # 5) Build the “design matrix” A with columns [1, x, y]
+    #    so that  A · [c0, c_x, c_y] = Z  in a least-squares sense
+    A = np.vstack([np.ones_like(Xf), Xf, Yf]).T
+
+    # 6) Solve for the three coefficients via linear least-squares
+    c0, c_x, c_y = np.linalg.lstsq(A, Z, rcond=None)[0]
+
+    # 7) Reconstruct the full plane on the original grid:
+    #    bg[i,j] = c0 + c_x*X[i,j] + c_y*Y[i,j]
+    bg = c0 + c_x * X + c_y * Y
+
+    return bg, (c0, c_x, c_y)
+
+
 def crop_img_base(image: np.ndarray, n_bottom: int) -> np.ndarray:
     """
     Crop a given number of pixels from the bottom of an image.

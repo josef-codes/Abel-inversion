@@ -215,3 +215,23 @@ def crop_three_sides(img: np.ndarray, r: int) -> np.ndarray:
     return cropped
 
 
+def crop_lrt(arr: np.ndarray, n: int) -> np.ndarray:
+    """
+    Crop the left, right, and top edges of a 2D image array by n pixels.
+
+    :param arr: 2D numpy array of shape (height, width).
+    :param n: Number of pixels to crop from the left, right, and top.
+    :return: Cropped 2D numpy array.
+    """
+    if arr.ndim != 2:
+        raise ValueError(f"Expected a 2D array, but got array with ndim={arr.ndim}")
+
+    h, w = arr.shape
+    if n < 0:
+        raise ValueError("n must be non-negative")
+    if 2 * n >= w or n >= h:
+        raise ValueError(f"Crop size n={n} too large for array shape {arr.shape}")
+
+    # rows: skip first n (top), keep until the end
+    # cols: skip first n (left), stop n before the end (right)
+    return arr[n:, n:w - n]
