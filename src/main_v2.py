@@ -28,25 +28,6 @@ import numpy as np  # low level image manipulation (matrix)
 import cmasher as cmr  # extra colormaps
 import json
 
-# ------------- DATA PATH --------------
-# this stays constant:
-path = global_constants.base_dir
-data_folders = global_utils.get_folder_names(path)  # ['IDEA program+ cvicna data', 'Images', 'Spectra']
-path2 = os.path.join(path, data_folders[1])
-# this will change:
-wavelength_folders = global_utils.get_folder_names(path2)
-
-path3 = os.path.join(path2, wavelength_folders[0]) # [0 = '1064 nm', 1 = '2090 nm']
-sample_folders = global_utils.get_folder_names(path3)
-# 0) [0 = 'H0_3_28_25', 1 = 'H6_3_31_25']
-# 1) ['Cu', 'H0', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'wrong']
-path4 = os.path.join(path3, sample_folders[1])
-measurement_folders = global_utils.get_folder_names(path4)
-print(data_folders)
-print(wavelength_folders)
-print(sample_folders)
-print(measurement_folders)
-# -------------------------------------
 # ------ DATA LOAD HERE -> each time folder evaluated independently --------
 # load:
 # 0a) load reference image
@@ -59,9 +40,9 @@ print(measurement_folders)
 
 # -------------- LOAD configurations ----------------------------
 # here I save images, .json etc...:
-output_dir = r'C:\Users\User\z\Desktop\WUT\Diplomka\ZPRACOVÁNÍ\Data testing\processing_project\Abel-inversion\output\(2) H6_1064_1-2us_v2'
+output_dir = r'C:\Users\User\z\Desktop\WUT\Diplomka\ZPRACOVÁNÍ\Data testing\processing_project\Abel-inversion\output\(4) Cu_2090_6-15us_v2'
 
-path_json = r'C:\Users\User\z\Desktop\WUT\Diplomka\DATA\Images\image processing param json\1064nm\(2) 1064nm_H6_1-2us.json'
+path_json = r'C:\Users\User\z\Desktop\WUT\Diplomka\DATA\Images\image processing param json\2090nm\(4) 2090nm_Cu_6-15us.json'
 with open(path_json) as f:
     data = json.load(f)
 
@@ -78,6 +59,7 @@ bool_tilt_masked = data['bool_tilt_masked']
 bool_normalise_phase = data['bool_normalise_phase']
 symmetrize_gauss = data['symmetrize_gauss']
 r_electron_density = data['r_electron_density']
+bool_nonzero_mask = data['bool_nonzero_mask']
 missing_bottom = data['missing_bottom']
 usable_data = data["usable"]
 
@@ -85,6 +67,7 @@ usable_data = data["usable"]
 otsu = data['otsu']
 method = otsu['method']
 n_classes = otsu['n_classes']
+threshold_index = otsu['threshold_index']
 remove_small = otsu['remove_small']
 close_size = otsu['close_size']
 otsu_sigma = otsu['otsu_sigma']
@@ -158,7 +141,25 @@ for col, exact in enumerate(range(1, 11)):
 
 # ----------------------------------------------------------------
 """
+# ------------- DATA PATH --------------
+# this stays constant:
+path = global_constants.base_dir
+data_folders = global_utils.get_folder_names(path)  # ['IDEA program+ cvicna data', 'Images', 'Spectra']
+path2 = os.path.join(path, data_folders[1])
+# this will change:
+wavelength_folders = global_utils.get_folder_names(path2)
 
+path3 = os.path.join(path2, wavelength_folders[1]) # [0 = '1064 nm', 1 = '2090 nm']
+sample_folders = global_utils.get_folder_names(path3)
+# 0) [0 = 'H0_3_28_25', 1 = 'H6_3_31_25']
+# 1) ['Cu', 'H0', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'wrong']
+path4 = os.path.join(path3, sample_folders[0])
+measurement_folders = global_utils.get_folder_names(path4)
+print(data_folders)
+print(wavelength_folders)
+print(sample_folders)
+print(measurement_folders)
+# -------------------------------------
 if __name__ == "__main__":
     # average elecron density:
     avg_el_density = []
@@ -170,11 +171,11 @@ if __name__ == "__main__":
     path_ref_files = os.path.join(path4, measurement_folders[9])
     files_ref = global_utils.get_file_names(path_ref_files)
     print(files_ref)
-    ref_path = os.path.join(path_ref_files, files_ref[3])  # path to reference image
+    ref_path = os.path.join(path_ref_files, files_ref[0])  # path to reference image
     ref = tiff.imread(ref_path)
     # image files
     # ['(1) 50-1000ns', '(2) 1000 - 2000 ns', '(3) 2-5us', '(4) 6-15us', '(5) 15-100us', '(6) 100-525us', '(7) 500us-2ms', 'reference x1', 'reference x2', 'reference x4', 'wrong beginning']
-    path_img_files = os.path.join(path4, measurement_folders[1]) #
+    path_img_files = os.path.join(path4, measurement_folders[3]) #
     files_img = global_utils.get_file_names(path_img_files)  # files to iterate over
     print(path_img_files)
     print(ref_path)
@@ -284,13 +285,15 @@ if __name__ == "__main__":
                 image_unwrapped = image_unwrapped - bg  # remove background
 
             if bool_normalise_phase:  # normalise to 0
-                    image_unwrapped = functions_abel.normalize_image(image_unwrapped, force_zero=True)  # normalise
+                image_unwrapped = functions_abel.normalize_image(image_unwrapped, force_zero=True)  # normalise
 
 
             semicircle_mask2 = functions_abel.make_semicircle_mask((rows, cols),
                                                                   center=(y0, x0),
                                                                   radius=mask_radius//2,
                                                                   smooth_sigma=None)
+
+            """
             # check if plasma is positive, else calculate again
             invert = functions_electron_density_analysis.masked_average(image_unwrapped, semicircle_mask2)
             max_val = np.max(image_unwrapped)
@@ -343,12 +346,11 @@ if __name__ == "__main__":
                         bg, coeffs = functions_phase_shift.fit_plane_background(image_unwrapped, mask=mask_flipped)
                     else:
                         bg, coeffs = functions_phase_shift.fit_plane_background(image_unwrapped)
-
                     image_unwrapped = image_unwrapped - bg  # remove background
 
                 if bool_normalise_phase:  # normalise to 0
                     image_unwrapped = functions_abel.normalize_image(image_unwrapped, force_zero=True)  # normalise
-
+                """
 
             # mask plasma:
             masked_plasma = image_unwrapped * semicircle_mask
@@ -383,6 +385,16 @@ if __name__ == "__main__":
                                                                         radius=r_electron_density,
                                                                         smooth_sigma=None)
                 electron_density_masked = electron_density * mask
+            elif bool_nonzero_mask:
+                # crop edge artefacts
+                r_no = mask_radius - crop_edge_artefacts
+                semicircle_mask = functions_abel.make_semicircle_mask((rows, cols),
+                                                                        center=(y0, x0),
+                                                                        radius=r_no,
+                                                                        smooth_sigma=None)
+                electron_density_pre_masked = electron_density * semicircle_mask
+                mask = functions_electron_density_analysis.extract_main_positive_region(electron_density_pre_masked)
+                electron_density_masked = electron_density_pre_masked * mask
             else:
                 # crop edge artefacts
                 r_no = mask_radius - crop_edge_artefacts
@@ -396,6 +408,7 @@ if __name__ == "__main__":
                     electron_density_pre_masked,
                     method='multiotsu',
                     n_classes=n_classes,
+                    threshold_index=threshold_index,
                     remove_small=remove_small,
                     close_size=close_size,  # use a 10×10 closing structuring element
                     gaussian_sigma=otsu_sigma,
