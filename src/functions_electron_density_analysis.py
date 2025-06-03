@@ -193,3 +193,83 @@ def fill_bottom_rectangle(mask: np.ndarray) -> np.ndarray:
     new_mask[bottom:H, left:right + 1] = True
 
     return new_mask
+
+
+def match_percentage(a: np.ndarray, b: np.ndarray) -> float:
+    # ensure arrays have identical shape
+    if a.shape != b.shape:
+        raise ValueError(f'Array shapes differ: {a.shape} vs {b.shape}')
+    # flatten both arrays into one dimensional vectors
+    v1 = a.ravel()
+    v2 = b.ravel()
+    # compute Pearson correlation coefficient matrix
+    corr_matrix = np.corrcoef(v1, v2)
+    # extract the off diagonal element
+    return corr_matrix[0, 1]
+
+
+def safe_match_percentage(a: np.ndarray, b: np.ndarray) -> float:
+    """
+    Compute the normalized cross correlation between two arrays as a percentage
+    without warnings in zero variance cases
+    """
+    v1 = a.ravel().astype(np.float64)
+    v2 = b.ravel().astype(np.float64)
+
+    v1m = v1 - v1.mean()
+    v2m = v2 - v2.mean()
+
+    norm1 = np.linalg.norm(v1m)
+    norm2 = np.linalg.norm(v2m)
+
+    if norm1 == 0 or norm2 == 0:
+        return 100.0 if np.allclose(v1, v2) else 0.0
+
+    corr = np.dot(v1m, v2m) / (norm1 * norm2)
+    corr = max(-1.0, min(1.0, corr))
+
+    return corr * 100.0
+
+def match_and_deviation(a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
+    """
+    Compute similarity between two arrays as both
+    normalized cross-correlation percentage and
+    normalized root-mean-square deviation percentage.
+    """
+    if a.shape != b.shape:
+        raise ValueError(f'Array shapes differ: {a.shape} vs {b.shape}')
+
+    # Flatten arrays
+    v1 = a.ravel().astype(np.float64)
+    v2 = b.ravel().astype(np.float64)
+
+    # Compute zero-mean vectors for correlation
+    v1m = v1 - v1.mean()
+    v2m = v2 - v2.mean()
+
+    # Norms for correlation
+    n1 = np.linalg.norm(v1m)
+    n2 = np.linalg.norm(v2m)
+
+    # Correlation coefficient handling zero variance
+    if n1 == 0 or n2 == 0:
+        corr_pct = 100.0 if np.allclose(v1, v2) else 0.0
+    else:
+        corr = np.dot(v1m, v2m) / (n1 * n2)
+        corr = max(-1.0, min(1.0, corr))
+        corr_pct = corr * 100.0
+
+    # Compute root-mean-square deviation
+    diff = v1 - v2
+    rmsd = np.sqrt(np.mean(diff * diff))
+
+    # Normalize by the full data range
+    data_min = min(v1.min(), v2.min())
+    data_max = max(v1.max(), v2.max())
+    dynamic_range = data_max - data_min
+    if dynamic_range == 0:
+        dev_pct = 0.0
+    else:
+        dev_pct = (rmsd / dynamic_range) * 100.0
+
+    return corr_pct, dev_pct

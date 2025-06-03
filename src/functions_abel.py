@@ -440,3 +440,135 @@ def revolve_profile_to_image(
         image[mask] = profile[idx[mask]]
 
     return image
+
+
+def revolve_profile_to_image_v2(
+    profile: np.ndarray,
+    center_idx: int,
+    output_size: int | None = None,
+    interp: bool = False,
+    crop_margin: int | None = 10
+) -> np.ndarray:
+    """
+    Revolve a 1D profile around its central axis to create a 2D radially symmetric image,
+    with optional cropping of the resulting circle.
+
+    Parameters
+    ----------
+    profile : 1D np.ndarray
+        The input profile of length M. The axis of symmetry is at index `center_idx`.
+    center_idx : int
+        Index corresponding to radius = 0.
+    output_size : int or None
+        Size of the output square image. If None, uses 2*r_max + 1,
+        where r_max = max(center_idx, M - center_idx - 1).
+    interp : bool
+        If True, use linear interpolation for non-integer radii; otherwise nearest-index.
+    crop_margin : int or None
+        If not None, crop the output image to the smallest square containing the
+        non-zero circle, then inset each side by `crop_margin` pixels.
+        Use None or negative to disable cropping.
+
+    Returns
+    -------
+    image : 2D np.ndarray
+        Radially-symmetric image (or cropped portion) of shape (N, N) or smaller if cropped.
+    """
+    M = profile.size
+    r_max = max(center_idx, M - center_idx - 1)
+    # determine output size
+    N = output_size if output_size is not None else 2 * r_max + 1
+    cx = cy = N // 2
+
+    # build coordinate grids
+    y = np.arange(N) - cy
+    x = np.arange(N) - cx
+    X, Y = np.meshgrid(x, y, indexing='xy')
+    R = np.sqrt(X**2 + Y**2)
+
+    # map radius to profile index and fill image
+    image = np.zeros((N, N), dtype=float)
+    if interp:
+        idx = center_idx + R
+        mask = (idx >= 0) & (idx <= M - 1)
+        image[mask] = np.interp(idx[mask], np.arange(M), profile)
+    else:
+        ri = np.rint(R).astype(int)
+        idx = center_idx + ri
+        mask = (idx >= 0) & (idx < M)
+        image[mask] = profile[idx[mask]]
+
+    # optional cropping based on the non-zero circular region
+    if crop_margin is not None and crop_margin >= 0:
+        ys, xs = np.where(mask)
+        y0, y1 = ys.min(), ys.max() + 1
+        x0, x1 = xs.min(), xs.max() + 1
+        # inset by margin
+        y0 = min(y0 + crop_margin, y1)
+        x0 = min(x0 + crop_margin, x1)
+        y1 = max(y1 - crop_margin, y0)
+        x1 = max(x1 - crop_margin, x0)
+        image = image[y0:y1, x0:x1]
+
+    return image
+
+
+def revolve_profile_to_image_v3(
+    profile: np.ndarray,
+    center_idx: int,
+    output_size: int | None = None,
+    interp: bool = False,
+) -> np.ndarray:
+    """
+    Revolve a 1D profile around its axis to create a square 2D image.
+
+    Parameters
+    ----------
+    profile : 1D array, shape (M,)
+        Radial profile; index `center_idx` → r = 0.
+    center_idx : int
+        Location in `profile` corresponding to r = 0.
+    output_size : int or None
+        Side length of the output image. If None, uses the minimal
+        2*r_max+1 that fits the full circle.
+    interp : bool
+        True → linear interpolation; False → nearest‐neighbor.
+
+    Returns
+    -------
+    image : 2D array, shape (N,N)
+        The revolved image, where N = `output_size` if given, else full circle size.
+    """
+    M = profile.size
+    # radius extent of full profile
+    r_max = max(center_idx, M - center_idx - 1)
+
+    # decide output size
+    if output_size is None:
+        N = 2*r_max + 1
+    else:
+        N = output_size
+    cx = cy = N // 2
+
+    # build grid of radii
+    y = np.arange(N) - cy
+    x = np.arange(N) - cx
+    X, Y = np.meshgrid(x, y, indexing='xy')
+    R = np.sqrt(X**2 + Y**2)
+
+    # allocate
+    img = np.zeros((N, N), dtype=profile.dtype)
+
+    if interp:
+        # continuous idx
+        idx = center_idx + R
+        valid = (idx >= 0) & (idx <= M-1)
+        img[valid] = np.interp(idx[valid], np.arange(M), profile)
+    else:
+        # nearest index
+        ri = np.rint(R).astype(int)
+        idx = center_idx + ri
+        valid = (idx >= 0) & (idx < M)
+        img[valid] = profile[idx[valid]]
+
+    return img
