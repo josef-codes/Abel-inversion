@@ -4,7 +4,7 @@
 The script uses the diffraction peak filtration technique to retrieve the phase image, symmetrizes the image, then uses one of PyAbel's Abel inversion algorithms to retrieve the change in index of refraction map of the plasma, then, from Drude's model equation, calculates the electron density map.
 
 ## Structure
-The Jupyter notebook lets the user view the data processing of a single Plasma measurement.
+The Jupyter notebook 'Phase_shift_extraction_automated.ipynb' lets the user view the data processing of a single Plasma measurement.
 
 ## Installation
 When installing the *PyAbel* package, if an error occurs, one must replace the nested function with:
