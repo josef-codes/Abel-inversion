@@ -1,6 +1,7 @@
 # Image processing script for plasma Electron density reconstruction from plasma interferograms
 - INPUT: Reference interferogram and Plasma interferogram
 - OUTPUT: Electron density map
+  
 The script uses the diffraction peak filtration technique to retrieve the phase image, symmetrizes the image, then uses one of PyAbel's Abel inversion algorithms to retrieve the change in index of refraction map of the plasma, then, from Drude's model equation, calculates the electron density map.
 
 ## Structure
