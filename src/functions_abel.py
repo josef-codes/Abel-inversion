@@ -380,7 +380,7 @@ def compute_electron_density(
     prefactor = omega * epsilon0 * m_electron / (e_charge**2)
 
     # output in cm-3
-    return prefactor * np.sqrt(arg) * 1e6
+    return prefactor * arg * 1e6
 
 
 def revolve_profile_to_image(
